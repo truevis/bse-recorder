@@ -11,7 +11,12 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <DebugType>embedded</DebugType>
+    <DebugType>none</DebugType>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <GenerateSatelliteAssembliesForCore>false</GenerateSatelliteAssembliesForCore>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,5 +27,10 @@
   <ItemGroup>
     <EmbeddedResource Include="Images\*.png" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <NoWarn>IL2026,IL2104,IL2075,IL2077</NoWarn>
+    <OptimizationPreference>Size</OptimizationPreference>
+  </PropertyGroup>
 
 </Project> 
