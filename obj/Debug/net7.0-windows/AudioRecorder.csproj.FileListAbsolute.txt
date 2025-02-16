@@ -1,0 +1,5 @@
+C:\GitHub\bse-recorder\obj\Debug\net7.0-windows\AudioRecorder.csproj.AssemblyReference.cache
+C:\GitHub\bse-recorder\obj\Debug\net7.0-windows\AudioRecorder.GeneratedMSBuildEditorConfig.editorconfig
+C:\GitHub\bse-recorder\obj\Debug\net7.0-windows\AudioRecorder.AssemblyInfoInputs.cache
+C:\GitHub\bse-recorder\obj\Debug\net7.0-windows\AudioRecorder.AssemblyInfo.cs
+C:\GitHub\bse-recorder\obj\Debug\net7.0-windows\AudioRecorder.csproj.CoreCompileInputs.cache
