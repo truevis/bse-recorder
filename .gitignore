@@ -1,0 +1,4 @@
+output/
+*.exe
+bin/
+obj/ 
