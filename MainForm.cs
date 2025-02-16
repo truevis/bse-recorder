@@ -2,6 +2,7 @@ using NAudio.Wave;
 using NAudio.Lame;
 using NAudio.Wave.SampleProviders;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace AudioRecorder
 {
@@ -14,16 +15,17 @@ namespace AudioRecorder
         private readonly Label statusLabel = new();
         private readonly System.Windows.Forms.Timer recordingTimer = new();
         private DateTime recordingStartTime;
-
-        // Embedded icons as base64 strings
-        private const string RecordIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAHUSURBVFiF7Ze9ThtBFIW/WQwCUiANosAigYgGhKwUKE+A8gYpkpQUKSLxDqSiSIWUJ0h4A0SVmg4bCrATAU0kaBYTwGDvTrEr4LLZH+wKN/mko5k7Z+Z+OzN3Z1ZUlf+J0LQDqGoHMAHcBw4Bq+0LgE/AO+C1iPyqm0dVGzWgBawDWqN9BFrN5KmxeRwYBb4C74FPwPfkfDdwBhgGHgIDwGERWa0KVtUFj5QvgHFgJ7Vkd4BpoAv4CbSBd8CyiKzFa/uBEeAhcA7YBM6KyHuPvBFgDrgK/AYuiMjXrEiqmgUWPYvmVbXPE7NPVec9sYuqmvn7qnoa+OzZ8RER+ZBnHAKuAVeAXuA5MCkiv3OAvcBt4BZwEvgBXBaRpRzfMWAWGAI2gIsi8jbLNwQ8Ae4BPcBLYEpENnPieoAJ4DFwAPgGXBORN1m+jVTQDPDCKxURWcgBngZmgH5gCbghIu0c31bgJvAU2A8sAw9E5EOe/x5gGrgPHAfeALdFZM0Xn3oKhoGXwFVgFRgVkc85wD7gDnAD2AcsAOMislIQvw94RHQPHCKqkkkR+V0Um/kYAheJxuoZ4ATRS/UCOCci7SLgfwUR2QSmgCngZ9PxfwDWNgpfOYWw5QAAAABJRU5ErkJggg==";
-        private const string StopIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABYSURBVFiF7dexDcAgDERRf5ZhGS/DMLl0KVIgubGFoPgnuYGnO8k2iIiIiIhYxd0l6ZS0m9klqf7NzAzA8ny0YNXrv+RR0vHlQl/q3mePpHvqElW1Zw8RsZ0HThwVJ2d0xSYAAAAASUVORK5CYII=";
+        private bool isPaused;
+        private WaveFileReader? playbackReader;
+        private WaveOut? playbackDevice;
+        private FlowLayoutPanel? buttonPanel;
 
         public MainForm()
         {
             InitializeComponent();
             SetupTimer();
             SetupUI();
+            UpdateButtonStates();
         }
 
         private static Image CreateImageFromBase64(string base64)
@@ -35,7 +37,7 @@ namespace AudioRecorder
 
         private void SetupTimer()
         {
-            recordingTimer.Interval = 1000; // Update every second
+            recordingTimer.Interval = 1000;
             recordingTimer.Tick += RecordingTimer_Tick;
         }
 
@@ -48,29 +50,31 @@ namespace AudioRecorder
         private void SetupUI()
         {
             this.Text = "System Audio Recorder";
-            this.Size = new Size(500, 300);
+            this.MinimumSize = new Size(500, 300);
+            this.Size = new Size(600, 400);
             this.BackColor = Color.White;
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
             this.StartPosition = FormStartPosition.CenterScreen;
 
-            // Main TableLayoutPanel to organize the layout
             var mainLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 2,
+                RowCount = 3,
                 ColumnCount = 1,
-                Padding = new Padding(10),
+                Padding = new Padding(20),
+                BackColor = Color.White
             };
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            // Instructions Panel
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+
             var instructionsPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(240, 240, 240),
-                Padding = new Padding(20, 10, 20, 10)
+                Margin = new Padding(0, 0, 0, 10),
+                BackColor = Color.FromArgb(245, 245, 245),
+                Padding = new Padding(20)
             };
 
             var instructionsLabel = new Label
@@ -79,156 +83,326 @@ namespace AudioRecorder
                       "1. Click Record to start recording\n" +
                       "2. Click Stop when finished\n" +
                       "3. Choose where to save your MP3 file",
-                Font = new Font("Segoe UI", 9f),
+                Font = new Font("Segoe UI", 10f),
                 Dock = DockStyle.Fill,
-                AutoSize = false
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft
             };
             instructionsPanel.Controls.Add(instructionsLabel);
 
-            // Controls Panel
-            var controlsPanel = new Panel
+            buttonPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20)
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = false,
+                Padding = new Padding(20),
+                Margin = new Padding(0, 10, 0, 10),
+                BackColor = Color.White
             };
 
-            var btnRecord = new Button
+            buttonPanel.SizeChanged += (s, e) =>
             {
-                Name = "Record",
-                Text = "Record",
-                Image = Image.FromFile("Icons/record.ico"),
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Font = new Font("Segoe UI", 10f, FontStyle.Regular),
-                Size = new Size(140, 40),
-                Location = new Point(20, 20),
-                FlatStyle = FlatStyle.Standard,
-                BackColor = Color.FromArgb(240, 240, 240),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(10, 0, 10, 0),
-                Cursor = Cursors.Hand
+                if (buttonPanel.Controls.Count > 0)
+                {
+                    int totalWidth = buttonPanel.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
+                    int x = (buttonPanel.Width - totalWidth) / 2;
+                    int y = (buttonPanel.Height - buttonPanel.Controls[0].Height) / 2;
+                    
+                    foreach (Control control in buttonPanel.Controls)
+                    {
+                        control.Location = new Point(x, y);
+                        x += control.Width + control.Margin.Horizontal;
+                    }
+                }
             };
-            btnRecord.Click += BtnRecord_Click;
 
-            var btnStop = new Button
+            var statusPanel = new Panel
             {
-                Name = "Stop",
-                Text = "Stop",
-                Image = Image.FromFile("Icons/stop.ico"),
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Font = new Font("Segoe UI", 10f, FontStyle.Regular),
-                Size = new Size(140, 40),
-                Location = new Point(180, 20),
-                FlatStyle = FlatStyle.Standard,
-                BackColor = Color.FromArgb(240, 240, 240),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(10, 0, 10, 0),
-                Enabled = false,
-                Cursor = Cursors.Hand
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(245, 245, 245),
+                Margin = new Padding(0, 10, 0, 0)
             };
-            btnStop.Click += BtnStop_Click;
 
             statusLabel.Text = "Ready to record";
-            statusLabel.Font = new Font("Segoe UI", 9f);
-            statusLabel.Location = new Point(20, 70);
-            statusLabel.AutoSize = true;
-            statusLabel.ForeColor = Color.FromArgb(100, 100, 100);
+            statusLabel.Dock = DockStyle.Fill;
+            statusLabel.TextAlign = ContentAlignment.MiddleCenter;
+            statusLabel.Font = new Font("Segoe UI", 10f);
+            statusPanel.Controls.Add(statusLabel);
 
-            // Add controls to panels
-            controlsPanel.Controls.AddRange(new Control[] { btnRecord, btnStop, statusLabel });
+            CreateButton("Record", "rec-button", BtnRecord_Click);
+            CreateButton("Pause", "pause-button", BtnPause_Click, false);
+            CreateButton("Stop", "stop-button", BtnStop_Click, false);
+            CreateButton("Play", "play-button", BtnPlay_Click, false);
+            CreateButton("Save", "save-button", BtnSave_Click, false);
 
-            // Add panels to TableLayoutPanel
             mainLayout.Controls.Add(instructionsPanel, 0, 0);
-            mainLayout.Controls.Add(controlsPanel, 0, 1);
+            mainLayout.Controls.Add(buttonPanel, 0, 1);
+            mainLayout.Controls.Add(statusPanel, 0, 2);
 
-            // Add TableLayoutPanel to form
-            Controls.Add(mainLayout);
+            this.Controls.Add(mainLayout);
+        }
+
+        private void CreateButton(string name, string iconName, EventHandler clickHandler, bool enabled = true)
+        {
+            var button = new Button
+            {
+                Name = name,
+                Text = "",
+                Size = new Size(56, 56),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ImageAlign = ContentAlignment.MiddleCenter,
+                Margin = new Padding(8),
+                Enabled = enabled,
+                Cursor = Cursors.Hand
+            };
+
+            // Load image from embedded resource
+            using (var stream = GetType().Assembly.GetManifestResourceStream($"AudioRecorder.Images.{iconName}.png"))
+            {
+                if (stream != null)
+                {
+                    using (var originalImage = Image.FromStream(stream))
+                    {
+                        var destRect = new Rectangle(0, 0, 40, 40);
+                        var destImage = new Bitmap(40, 40);
+
+                        destImage.SetResolution(originalImage.HorizontalResolution, originalImage.VerticalResolution);
+
+                        using (var graphics = Graphics.FromImage(destImage))
+                        {
+                            graphics.CompositingMode = CompositingMode.SourceCopy;
+                            graphics.CompositingQuality = CompositingQuality.HighQuality;
+                            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                            graphics.SmoothingMode = SmoothingMode.HighQuality;
+                            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                            using (var wrapMode = new ImageAttributes())
+                            {
+                                wrapMode.SetWrapMode(WrapMode.TileFlipXY);
+                                graphics.DrawImage(originalImage, destRect, 0, 0, originalImage.Width, originalImage.Height, GraphicsUnit.Pixel, wrapMode);
+                            }
+                        }
+
+                        button.Image = destImage;
+                    }
+                }
+            }
+
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 220);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 240, 240);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(230, 230, 230);
+
+            button.MouseEnter += (s, e) => {
+                if (button.Enabled)
+                    button.BackColor = Color.FromArgb(245, 245, 245);
+            };
+            button.MouseLeave += (s, e) => {
+                if (button.Enabled)
+                    button.BackColor = Color.White;
+            };
+
+            button.Click += clickHandler;
+            buttonPanel?.Controls.Add(button);
         }
 
         private void BtnRecord_Click(object? sender, EventArgs e)
         {
-            if (!isRecording)
-            {
-                StartRecording();
-                if (sender is Button btn) btn.Enabled = false;
-                var stopButton = Controls.Find("Stop", false).FirstOrDefault();
-                if (stopButton != null) stopButton.Enabled = true;
-                
-                recordingStartTime = DateTime.Now;
-                recordingTimer.Start();
-                statusLabel.Text = "Recording: 00:00:00";
-            }
+            if (isRecording) return;
+
+            recordingStartTime = DateTime.Now;
+            StartRecording();
+            recordingTimer.Start();
+            UpdateButtonStates();
         }
 
         private void BtnStop_Click(object? sender, EventArgs e)
         {
-            if (isRecording && tempWavPath != null)
+            if (!isRecording) return;
+            
+            StopRecording();
+            recordingTimer.Stop();
+            statusLabel.Text = "Ready to record";
+            UpdateButtonStates();
+        }
+
+        private void BtnPause_Click(object? sender, EventArgs e)
+        {
+            if (!isRecording) return;
+
+            isPaused = !isPaused;
+            if (isPaused)
             {
-                StopRecording();
-                if (sender is Button btn) btn.Enabled = false;
-                var recordButton = Controls.Find("Record", false).FirstOrDefault();
-                if (recordButton != null) recordButton.Enabled = true;
-
+                capture?.StopRecording();
+                statusLabel.Text = "Recording paused";
                 recordingTimer.Stop();
-                statusLabel.Text = "Ready to record";
-
-                SaveFileDialog saveFileDialog = new SaveFileDialog
-                {
-                    Filter = "MP3 files (*.mp3)|*.mp3",
-                    DefaultExt = "mp3",
-                    Title = "Save recording as MP3"
-                };
-
-                if (saveFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    statusLabel.Text = "Converting to MP3...";
-                    Application.DoEvents();
-                    
-                    ConvertToMp3(tempWavPath, saveFileDialog.FileName);
-                    File.Delete(tempWavPath);
-                    
-                    statusLabel.Text = "Ready to record";
-                }
             }
+            else
+            {
+                StartRecording();
+                statusLabel.Text = $"Recording: {DateTime.Now - recordingStartTime:hh\\:mm\\:ss}";
+                recordingTimer.Start();
+            }
+            UpdateButtonStates();
         }
 
         private void StartRecording()
         {
-            tempWavPath = Path.Combine(Path.GetTempPath(), "temp_recording.wav");
-            capture = new WasapiLoopbackCapture();
-            writer = new WaveFileWriter(tempWavPath, capture.WaveFormat);
-
-            capture.DataAvailable += (s, e) =>
+            try
             {
-                writer?.Write(e.Buffer, 0, e.BytesRecorded);
-            };
+                if (!isPaused)
+                {
+                    tempWavPath = Path.Combine(Path.GetTempPath(), "temp_recording.wav");
+                    capture = new WasapiLoopbackCapture();
+                    writer = new WaveFileWriter(tempWavPath, capture.WaveFormat);
 
-            capture.RecordingStopped += (s, e) =>
+                    capture.DataAvailable += Capture_DataAvailable;
+                    capture.RecordingStopped += Capture_RecordingStopped;
+                }
+
+                isRecording = true;
+                capture?.StartRecording();
+                UpdateButtonStates();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error starting recording: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                StopRecording();
+            }
+        }
+
+        private void Capture_DataAvailable(object? sender, WaveInEventArgs e)
+        {
+            if (writer != null)
+            {
+                writer.Write(e.Buffer, 0, e.BytesRecorded);
+            }
+        }
+
+        private void Capture_RecordingStopped(object? sender, StoppedEventArgs e)
+        {
+            if (!isPaused)
             {
                 writer?.Dispose();
                 writer = null;
                 capture?.Dispose();
                 capture = null;
-            };
-
-            isRecording = true;
-            capture.StartRecording();
+            }
         }
 
         private void StopRecording()
         {
-            isRecording = false;
-            capture?.StopRecording();
+            try
+            {
+                isRecording = false;
+                isPaused = false;
+                
+                capture?.StopRecording();
+                writer?.Dispose();
+                writer = null;
+                capture?.Dispose();
+                capture = null;
+                
+                UpdateButtonStates();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error stopping recording: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void UpdateButtonStates()
+        {
+            if (buttonPanel == null) return;
+
+            var recordButton = buttonPanel.Controls["Record"] as Button;
+            var pauseButton = buttonPanel.Controls["Pause"] as Button;
+            var stopButton = buttonPanel.Controls["Stop"] as Button;
+            var playButton = buttonPanel.Controls["Play"] as Button;
+            var saveButton = buttonPanel.Controls["Save"] as Button;
+
+            if (recordButton != null) recordButton.Enabled = !isRecording;
+            if (pauseButton != null) pauseButton.Enabled = isRecording;
+            if (stopButton != null) stopButton.Enabled = isRecording;
+            if (playButton != null) playButton.Enabled = !isRecording && tempWavPath != null && File.Exists(tempWavPath);
+            if (saveButton != null) saveButton.Enabled = !isRecording && tempWavPath != null && File.Exists(tempWavPath);
+        }
+
+        private void BtnPlay_Click(object? sender, EventArgs e)
+        {
+            if (playbackDevice?.PlaybackState == PlaybackState.Playing)
+            {
+                playbackDevice?.Stop();
+                return;
+            }
+
+            if (tempWavPath != null && File.Exists(tempWavPath))
+            {
+                try
+                {
+                    playbackReader?.Dispose();
+                    playbackDevice?.Dispose();
+
+                    playbackReader = new WaveFileReader(tempWavPath);
+                    playbackDevice = new WaveOut();
+                    playbackDevice.Init(playbackReader);
+                    playbackDevice.Play();
+                    statusLabel.Text = "Playing recording...";
+
+                    playbackDevice.PlaybackStopped += (s, args) =>
+                    {
+                        if (IsDisposed) return;
+                        Invoke(() => statusLabel.Text = "Ready to record");
+                    };
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error playing recording: {ex.Message}", "Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnSave_Click(object? sender, EventArgs e)
+        {
+            if (tempWavPath == null || !File.Exists(tempWavPath)) return;
+
+            using var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "MP3 files (*.mp3)|*.mp3",
+                DefaultExt = "mp3",
+                Title = "Save recording as MP3"
+            };
+
+            if (saveFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    statusLabel.Text = "Converting to MP3...";
+                    Application.DoEvents();
+                    ConvertToMp3(tempWavPath, saveFileDialog.FileName);
+                    statusLabel.Text = "Ready to record";
+                    MessageBox.Show("Recording saved successfully!", "Success", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error saving recording: {ex.Message}", "Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    statusLabel.Text = "Error saving recording";
+                }
+            }
         }
 
         private void ConvertToMp3(string wavPath, string mp3Path)
         {
-            using (var reader = new AudioFileReader(wavPath))
-            using (var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, LAMEPreset.STANDARD))
-            {
-                reader.CopyTo(writer);
-            }
+            using var reader = new AudioFileReader(wavPath);
+            using var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, LAMEPreset.STANDARD);
+            reader.CopyTo(writer);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -237,6 +411,28 @@ namespace AudioRecorder
             {
                 StopRecording();
             }
+
+            if (capture != null)
+            {
+                capture.DataAvailable -= Capture_DataAvailable;
+                capture.RecordingStopped -= Capture_RecordingStopped;
+            }
+
+            playbackReader?.Dispose();
+            playbackDevice?.Dispose();
+
+            if (tempWavPath != null && File.Exists(tempWavPath))
+            {
+                try
+                {
+                    File.Delete(tempWavPath);
+                }
+                catch
+                {
+                    // Ignore cleanup errors on exit
+                }
+            }
+
             base.OnFormClosing(e);
         }
     }
