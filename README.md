@@ -24,7 +24,9 @@ A lightweight Windows application that records audio from your sound card and sa
 ## Usage
 
 1. Download the latest release
-2. Run app can use bash "dotnet run --project AudioRecorder.csproj" or the release EXE
+2. Run the application:
+   - Using command line: `dotnet run --project AudioRecorder.csproj`
+   - Or simply double-click the release EXE file
 3. Click "Record" to begin capturing system audio
 4. Use "Pause" to temporarily halt recording without stopping
 5. Click "Stop" when finished
