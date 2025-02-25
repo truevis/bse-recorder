@@ -42,13 +42,6 @@ The application offers multiple quality presets for MP3 encoding:
 - High (256 kbps) - Better quality for music
 - Extreme (320 kbps) - Maximum quality, larger file size
 
-## Building from Source
-
-1. Clone the repository
-2. Open the solution in Visual Studio 2022
-3. Build the solution
-4. Run the `publish.bat` script to create a standalone executable
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
