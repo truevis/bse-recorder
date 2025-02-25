@@ -42,6 +42,21 @@ The application offers multiple quality presets for MP3 encoding:
 - High (256 kbps) - Better quality for music
 - Extreme (320 kbps) - Maximum quality, larger file size
 
+## Building from Source
+
+The project includes a `publish.bat` script that automates the build process:
+
+1. Clone the repository
+2. Run `publish.bat` from the command line
+3. The script will:
+   - Clean previous build files
+   - Remove any duplicate source files
+   - Build a self-contained, single-file executable
+   - Copy the executable to the "output" folder
+   - Clean up temporary build files
+
+The resulting executable in the "output" folder is portable and doesn't require separate installation of the .NET runtime.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
