@@ -2,7 +2,7 @@
 
 A lightweight Windows application that records audio from your sound card and saves it directly as MP3.
 
-![System Audio Recorder](images/2025-02-16%2015_46_41-System%20Audio%20Recorder.png)
+![System Audio Recorder](images/System%20Audio%20Recorder.png)
 
 ## Features
 
