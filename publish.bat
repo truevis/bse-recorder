@@ -2,6 +2,18 @@ echo Cleaning previous build files...
 rmdir /s /q "bin" 
 rmdir /s /q "obj" 
 
+echo Checking for duplicate files...
+if exist "MainForm copy.cs" del "MainForm copy.cs"
+if exist "MainForm - Copy.cs" del "MainForm - Copy.cs" 
+if exist "Copy of MainForm.cs" del "Copy of MainForm.cs"
+
+echo Checking for hidden duplicates...
+dir /b /s MainForm*.cs > temp_files.txt
+findstr /v /i "MainForm.cs MainForm.Designer.cs" temp_files.txt > duplicate_files.txt
+for /f "tokens=*" %%a in (duplicate_files.txt) do del "%%a"
+del temp_files.txt
+del duplicate_files.txt
+
 echo.
 echo Building application...
 dotnet publish -c Release -r win-x64 ^

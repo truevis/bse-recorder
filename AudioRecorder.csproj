@@ -17,6 +17,7 @@
     <DebugSymbols>false</DebugSymbols>
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
     <GenerateSatelliteAssembliesForCore>false</GenerateSatelliteAssembliesForCore>
+    <ApplicationIcon>Images\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +27,13 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Images\*.png" />
+    <EmbeddedResource Include="Images\*.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="MainForm copy.cs" />
+    <Compile Remove="MainForm - Copy.cs" />
+    <Compile Remove="Copy of MainForm.cs" />
   </ItemGroup>
 
   <PropertyGroup>

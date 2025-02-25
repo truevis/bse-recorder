@@ -11,6 +11,9 @@ A lightweight Windows application that records audio from your sound card and sa
 - Simple and intuitive interface
 - No installation required - portable executable
 - Minimal CPU usage
+- Pause and resume recording
+- Adjustable MP3 quality settings
+- Preview recordings before saving
 
 ## Requirements
 
@@ -21,10 +24,28 @@ A lightweight Windows application that records audio from your sound card and sa
 ## Usage
 
 1. Download the latest release
-2. Run `AudioRecorder.exe`
-3. Click "Start Recording" to begin
-4. Click "Stop Recording" when finished
-5. Your MP3 file will be saved in the selected output directory
+2. Run app can use bash "dotnet run --project AudioRecorder.csproj" or the release EXE
+3. Click "Record" to begin capturing system audio
+4. Use "Pause" to temporarily halt recording without stopping
+5. Click "Stop" when finished
+6. Preview your recording with the "Play" button
+7. Click "Save" to convert and store as MP3
+8. Your MP3 file will be saved in the selected output directory
+
+## MP3 Quality Options
+
+The application offers multiple quality presets for MP3 encoding:
+- Low (128 kbps) - Smaller file size, good for voice recordings
+- Medium (192 kbps) - Balanced quality and size
+- High (256 kbps) - Better quality for music
+- Extreme (320 kbps) - Maximum quality, larger file size
+
+## Building from Source
+
+1. Clone the repository
+2. Open the solution in Visual Studio 2022
+3. Build the solution
+4. Run the `publish.bat` script to create a standalone executable
 
 ## License
 
@@ -32,5 +53,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- NAudio library for audio processing
-- LAME MP3 encoder 
+- [NAudio](https://github.com/naudio/NAudio) library for audio processing
+- [LAME MP3 encoder](https://lame.sourceforge.io/) for MP3 conversion 

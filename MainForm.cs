@@ -3,6 +3,8 @@ using NAudio.Lame;
 using NAudio.Wave.SampleProviders;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace AudioRecorder
 {
@@ -19,11 +21,14 @@ namespace AudioRecorder
         private WaveFileReader? playbackReader;
         private WaveOut? playbackDevice;
         private FlowLayoutPanel? buttonPanel;
+        private ComboBox? qualityComboBox;
+        private LAMEPreset selectedQuality = LAMEPreset.EXTREME;
 
         public MainForm()
         {
             InitializeComponent();
             SetupTimer();
+            SetApplicationIcon();
             SetupUI();
             UpdateButtonStates();
         }
@@ -50,8 +55,8 @@ namespace AudioRecorder
         private void SetupUI()
         {
             this.Text = "System Audio Recorder";
-            this.MinimumSize = new Size(500, 300);
-            this.Size = new Size(600, 400);
+            this.MinimumSize = new Size(500, 350);
+            this.Size = new Size(600, 450);
             this.BackColor = Color.White;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -59,14 +64,16 @@ namespace AudioRecorder
             var mainLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                RowCount = 4,
                 ColumnCount = 1,
                 Padding = new Padding(20),
                 BackColor = Color.White
             };
 
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            mainLayout.RowStyles.Clear();
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 35));
             mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
 
             var instructionsPanel = new Panel
@@ -89,6 +96,58 @@ namespace AudioRecorder
                 TextAlign = ContentAlignment.MiddleLeft
             };
             instructionsPanel.Controls.Add(instructionsLabel);
+
+            var qualityPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 10),
+                BackColor = Color.FromArgb(245, 245, 245),
+                Padding = new Padding(20, 25, 20, 25)
+            };
+
+            var qualityLabel = new Label
+            {
+                Text = "MP3 Quality:",
+                Font = new Font("Segoe UI", 10f),
+                AutoSize = true
+            };
+
+            qualityComboBox = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10f),
+                Width = 300,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top
+            };
+
+            // Calculate position to center the controls horizontally
+            int totalWidth = qualityLabel.PreferredWidth + 10 + qualityComboBox.Width;
+            int startX = (qualityPanel.ClientSize.Width - totalWidth) / 2;
+            if (startX < 20) startX = 20; // Minimum left margin
+
+            // Adjust vertical position to ensure text is fully visible
+            qualityLabel.Location = new Point(startX, 25);
+            qualityComboBox.Location = new Point(startX + qualityLabel.PreferredWidth + 10, 23);
+
+            qualityComboBox.Items.Add(new QualityOption("Extreme (320 kbps)", LAMEPreset.EXTREME, 320));
+            qualityComboBox.Items.Add(new QualityOption("Standard (192 kbps)", LAMEPreset.STANDARD, 192));
+            qualityComboBox.Items.Add(new QualityOption("Medium (160 kbps)", LAMEPreset.MEDIUM, 160));
+            qualityComboBox.Items.Add(new QualityOption("Low (128 kbps)", LAMEPreset.ABR_128, 128));
+
+            qualityComboBox.SelectedIndex = 0;
+            qualityComboBox.SelectedIndexChanged += QualityComboBox_SelectedIndexChanged;
+
+            // Add a resize handler to keep the controls centered
+            qualityPanel.Resize += (s, e) => {
+                int newStartX = (qualityPanel.ClientSize.Width - totalWidth) / 2;
+                if (newStartX < 20) newStartX = 20;
+                
+                qualityLabel.Left = newStartX;
+                qualityComboBox.Left = newStartX + qualityLabel.PreferredWidth + 10;
+            };
+
+            qualityPanel.Controls.Add(qualityLabel);
+            qualityPanel.Controls.Add(qualityComboBox);
 
             buttonPanel = new FlowLayoutPanel
             {
@@ -137,8 +196,9 @@ namespace AudioRecorder
             CreateButton("Save", "save-button", BtnSave_Click, false);
 
             mainLayout.Controls.Add(instructionsPanel, 0, 0);
-            mainLayout.Controls.Add(buttonPanel, 0, 1);
-            mainLayout.Controls.Add(statusPanel, 0, 2);
+            mainLayout.Controls.Add(qualityPanel, 0, 1);
+            mainLayout.Controls.Add(buttonPanel, 0, 2);
+            mainLayout.Controls.Add(statusPanel, 0, 3);
 
             this.Controls.Add(mainLayout);
         }
@@ -385,9 +445,14 @@ namespace AudioRecorder
                     statusLabel.Text = "Converting to MP3...";
                     Application.DoEvents();
                     ConvertToMp3(tempWavPath, saveFileDialog.FileName);
-                    statusLabel.Text = "Ready to record";
-                    MessageBox.Show("Recording saved successfully!", "Success", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    statusLabel.Text = "Recording saved successfully!";
+                    
+                    // Wait a moment to show the success message, then reset
+                    Task.Delay(2000).ContinueWith(_ => {
+                        if (!IsDisposed && statusLabel != null) {
+                            this.Invoke(() => statusLabel.Text = "Ready to record");
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -401,9 +466,57 @@ namespace AudioRecorder
         private void ConvertToMp3(string wavPath, string mp3Path)
         {
             using var reader = new AudioFileReader(wavPath);
-            using var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, LAMEPreset.STANDARD);
+            
+            // Get the bitrate from the selected quality option
+            int bitrate = 320; // Default to highest quality
+            if (qualityComboBox?.SelectedItem is QualityOption option)
+            {
+                bitrate = option.Bitrate;
+            }
+            
+            // For NAudio.Lame 2.1.0, we need to use ID3 tag version
+            var id3 = new NAudio.Lame.ID3TagData
+            {
+                Title = "System Audio Recording",
+                Comment = $"Recorded at {bitrate}kbps"
+            };
+            
+            // Use explicit bitrate with the constructor that accepts ID3 and bitrate
+            using var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, bitrate, id3);
             reader.CopyTo(writer);
         }
+
+        private void QualityComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (qualityComboBox?.SelectedItem is QualityOption option)
+            {
+                selectedQuality = option.Preset;
+            }
+        }
+
+        private void SetApplicationIcon()
+        {
+            try
+            {
+                // Load icon from embedded resource
+                using (var stream = GetType().Assembly.GetManifestResourceStream("AudioRecorder.Images.app-icon.ico"))
+                {
+                    if (stream != null)
+                    {
+                        this.Icon = new Icon(stream);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently fail if icon can't be loaded - not critical
+                Console.WriteLine($"Failed to load application icon: {ex.Message}");
+            }
+        }
+
+        // P/Invoke to release the native icon handle
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
@@ -434,6 +547,25 @@ namespace AudioRecorder
             }
 
             base.OnFormClosing(e);
+        }
+    }
+
+    internal class QualityOption
+    {
+        public string Name { get; }
+        public LAMEPreset Preset { get; }
+        public int Bitrate { get; }
+
+        public QualityOption(string name, LAMEPreset preset, int bitrate)
+        {
+            Name = name;
+            Preset = preset;
+            Bitrate = bitrate;
+        }
+
+        public override string ToString()
+        {
+            return Name;
         }
     }
 } 
