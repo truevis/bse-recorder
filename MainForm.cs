@@ -467,6 +467,14 @@ namespace AudioRecorder
         {
             using var reader = new AudioFileReader(wavPath);
             
+            // Convert to stereo if needed
+            ISampleProvider audioProvider = reader;
+            if (reader.WaveFormat.Channels > 2)
+            {
+                var multiplexer = new MultiplexingWaveProvider(new[] { reader }, 2);
+                audioProvider = multiplexer.ToSampleProvider();
+            }
+            
             // Get the bitrate from the selected quality option
             int bitrate = 320; // Default to highest quality
             if (qualityComboBox?.SelectedItem is QualityOption option)
@@ -481,9 +489,21 @@ namespace AudioRecorder
                 Comment = $"Recorded at {bitrate}kbps"
             };
             
+            // Create stereo wave format for output
+            var stereoFormat = new WaveFormat(reader.WaveFormat.SampleRate, 2);
+            
             // Use explicit bitrate with the constructor that accepts ID3 and bitrate
-            using var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, bitrate, id3);
-            reader.CopyTo(writer);
+            using var writer = new LameMP3FileWriter(mp3Path, stereoFormat, bitrate, id3);
+            
+            // Convert samples and write
+            var buffer = new float[8192];
+            int samplesRead;
+            while ((samplesRead = audioProvider.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                byte[] bytes = new byte[samplesRead * 4]; // 4 bytes per float (32 bits)
+                Buffer.BlockCopy(buffer, 0, bytes, 0, samplesRead * 4);
+                writer.Write(bytes, 0, bytes.Length);
+            }
         }
 
         private void QualityComboBox_SelectedIndexChanged(object? sender, EventArgs e)
